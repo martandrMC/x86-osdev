@@ -15,7 +15,7 @@ BPB_HEAD_COUNT     equ 0x1A
 ; Sector buffer occupies the majority of the memory under our origin
 SECTBUF_SEG equ 0x0060 ; Starts at 0x00600
 SECTBUF_SIZ equ 59     ; 59 sectors = 29.5 kiB (0x7600 bytes)
-LOADER_BASE equ 0x0800 ; Memory area above boot sector (0x08000)
+CLUSBUF_SEG equ 0x0800 ; Segment of memory area above boot sector (0x08000)
 
 ; ============================================================================ ;
 
@@ -32,10 +32,10 @@ boot_realmode:
 	mov ax, cs
 	mov ds, ax
 
-	; Setup the stack to occupy 0x7D00 - 0x8000
-	mov ax, 0x7D0
+	; Setup the stack to occupy 0x07E00 - 0x08000
+	mov ax, 0x7E0
 	mov ss, ax
-	mov sp, 0x300
+	mov sp, 0x200
 	mov bp, sp
 
 	; Setup DS to point to our initial sector buffer
@@ -122,7 +122,7 @@ boot_realmode:
 
 	mov ax, es
 	mov ds, ax          ; Sector buffer with FAT now under DS
-	mov ax, LOADER_BASE ; Prepare new cluster buffer for second stage
+	mov ax, CLUSBUF_SEG ; Prepare new cluster buffer for second stage
 	mov es, ax          ; Cluster buffer now on ES for sector_rw to use
 	.next:
 
@@ -164,11 +164,11 @@ boot_realmode:
 	; -------------------------------------------------------------------- ;
 
 	; Setup the segments for the second stage
-	mov ax, LOADER_BASE
+	mov ax, CLUSBUF_SEG
 	mov ds, ax
 	mov es, ax
 	mov sp, bp        ; Clear the stack
-	jmp LOADER_BASE:0 ; Jump to second stage
+	jmp CLUSBUF_SEG:0 ; Jump to second stage
 
 ; ============================================================================ ;
 
