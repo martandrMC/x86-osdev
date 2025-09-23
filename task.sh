@@ -25,12 +25,12 @@ function process_task {
 			mkfs.fat -F12 -n "$LABEL" -s2 $IMAGE
 			nasm -fbin $BOOT -o /dev/stdout | \
 				dd bs=1 seek=62 conv=notrunc of=$IMAGE
-			add_sysfile "$SOURCE/loader/main.asm" "loader"
+			add_sysfile "$SOURCE/loader/entry.asm" "loader"
 		;;
 
 		"run")
 			local floppy="-drive format=raw,if=floppy,index=0,file=$IMAGE"
-			GDK_SCALE=2 qemu-system-i386 \
+			GDK_SCALE=2 qemu-system-i386 -machine accel=kvm \
 				-boot order=a $floppy -display gtk
 		;;
 

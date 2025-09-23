@@ -13,16 +13,15 @@
 	db %2 >> 24 & 0xFF          ; base[31:24]
 %endmacro
 
-; gdt_begin label
-; gdt_begin label, offset_adjust
-%macro gdt_begin 1-2 0
+; table_begin label
+; table_begin label, offset_adjust
+%macro table_begin 1-2 0
 	%1:
 	dw ._end - ._bgn - 1
 	dd %2 + ._bgn
 	._bgn:
-	gdt_entry null, 0, 0, 0
 %endmacro
 
-%macro gdt_end 0
+%macro table_end 0
 	._end:
 %endmacro

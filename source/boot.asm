@@ -36,7 +36,6 @@ boot_realmode:
 	mov ax, 0x7E0
 	mov ss, ax
 	mov sp, 0x200
-	mov bp, sp
 
 	; Setup DS to point to our initial sector buffer
 	mov ax, SECTBUF_SEG
@@ -137,7 +136,7 @@ boot_realmode:
 		add cx, ax      ; Offset into the data area, amount of sectors
 		mov ax, bx      ; Read one cluster from floppy (command on AX)
 		xor bx, bx      ; Start of our cluster buffer
-		call sector_rw  ; Do the cluster read (tail call)
+		call sector_rw  ; Do the cluster read
 
 		; Advance the cluster buffer pointer
 		shl ax, 5  ; AH = 0, AL = sectors read, mult by 32
@@ -167,7 +166,6 @@ boot_realmode:
 	mov ax, CLUSBUF_SEG
 	mov ds, ax
 	mov es, ax
-	mov sp, bp        ; Clear the stack
 	jmp CLUSBUF_SEG:0 ; Jump to second stage
 
 ; ============================================================================ ;
