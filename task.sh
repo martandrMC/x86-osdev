@@ -29,15 +29,16 @@ function process_task {
 		;;
 
 		"run")
-			local floppy="-drive format=raw,if=floppy,index=0,file=$IMAGE"
-			GDK_SCALE=2 qemu-system-i386 -machine accel=kvm \
-				-boot order=a $floppy -display gtk
+			local floppy="format=raw,if=floppy,index=0,file=$IMAGE"
+			GDK_SCALE=1 qemu-system-i386 -M accel=kvm -m 16 \
+				-boot order=a -drive $floppy -display gtk
 		;;
 
-		"debug")
-			local floppy="-drive format=raw,if=floppy,index=0,file=$IMAGE"
-			GDK_SCALE=2 qemu-system-i386 -S -s -d int \
-				-boot order=a $floppy -display gtk
+		"dbg")
+			local floppy="format=raw,if=floppy,index=0,file=$IMAGE"
+			GDK_SCALE=2 qemu-system-i386 -M accel=kvm -m 16 \
+				-boot order=a -drive $floppy -display gtk \
+				-S -s -d int
 		;;
 	esac
 }

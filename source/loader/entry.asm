@@ -1,75 +1,110 @@
-%include "source/loader/tables.asm"
-LOADER_BASE equ 0x08000
-org 0x0000
-
 bits 16
+
+LOADER_BASE equ 0x08000
+
+org 0x0000
 loader_realmode:
 	xor ah, ah
 	mov al, 3
 	int 0x10
 
+	mov  di, buffer
+	xor ebx, ebx
+	.next:
+		mov ecx, 24
+		mov edx, 0x534D4150
+		mov eax, 0xE820
+		int 0x15
+		call print_entry
+	test ebx, ebx
+	jnz short .next
+
 	cli
-	lgdt [gdt]
-
-	in al, 0x92
-	or al, 2
-	out 0x92, al
-
-	mov eax, cr0
-	or eax, 1
-	mov cr0, eax
-	jmp 0x8:prot_entry
-
-bits 32
-table_begin gdt, LOADER_BASE
-	.null: dq 0
-	gdt_entry code, LOADER_BASE, 0x00077, 0b10011010_1100
-	gdt_entry data, LOADER_BASE, 0x00077, 0b10010010_1100
-	gdt_entry stak, LOADER_BASE, 0xFFFF8, 0b10010110_1100
-	gdt_entry flat, 0,           0xFFFFF, 0b10010010_1100
-table_end
-
-table_begin idt, LOADER_BASE
-times 256 dq 0
-table_end
-
-interrupt:
-	mov word [fs:0xB8000], 0x0421
 	hlt
 
-prot_entry:
-	mov ax, 0x10
-	mov ds, ax
-	mov es, ax
+print_entry:
+	push ds
+	mov si, es
+	mov ds, si
 
-	mov ax, 0x18
-	mov ss, ax
-	xor esp, esp
+	mov ax, 0x0E20
 
-	mov ax, 0x20
-	mov fs, ax
-	mov gs, ax
+	lea si, [di + 0]
+	call put_hex_qword
+	int 0x10
+	lea si, [di + 8]
+	call put_hex_qword
+	int 0x10
+	lea si, [di + 16]
+	call put_hex_dword
+	int 0x10
+	lea si, [di + 20]
+	call put_hex_dword
+	mov al, 0x0D
+	int 0x10
+	mov al, 0x0A
+	int 0x10
 
-	mov al, 0xFF
-	out 0x21, al
-	out 0xA1, al
-
-	lea ebx, [idt._bgn + 0x0D * 8]
-	lea eax, [interrupt]
-	mov word [ebx + 0], ax
-	mov word [ebx + 2], 0x0008
-	mov byte [ebx + 4], 0x00
-	mov byte [ebx + 5], 0x8E
-	shr eax, 16
-	mov word [ebx + 6], ax
-
-	lidt [idt]
-	sti
-
-	call main
-	hlt
-
-main:
-	; intentional segfault
-	mov byte [0x78000], 0xFF
+	pop ds
 	ret
+
+; Byte in AL
+; Clobbers AX
+put_hex_byte:
+	push ax
+	shr al, 4
+	call .put_nibble
+	pop ax
+	and al, 0xF
+	call .put_nibble
+	ret
+
+	.put_nibble:
+	cmp al, 9
+	jbe short .skip
+	add al, 7
+	.skip:
+	add al, '0'
+	mov ah, 0x0E
+	int 0x10
+	ret
+
+; Word in AX
+; Clobbers AX
+put_hex_word:
+	push ax
+	mov al, ah
+	call put_hex_byte
+	pop ax
+	call put_hex_byte
+	ret
+
+; DWord pointer in DS:SI
+put_hex_dword:
+	push ax
+	mov ax, [si + 2]
+	call put_hex_word
+	mov ax, [si + 0]
+	call put_hex_word
+	pop ax
+	ret
+
+; QWord pointer in DS:SI
+put_hex_qword:
+	push ax
+	mov ax, [si + 6]
+	call put_hex_word
+	mov ax, [si + 4]
+	call put_hex_word
+	mov ax, [si + 2]
+	call put_hex_word
+	mov ax, [si + 0]
+	call put_hex_word
+	pop ax
+	ret
+
+buffer:
+	.base: dq 0
+	.size: dq 0
+	.type: dd 0
+	.acpi: dd 0
