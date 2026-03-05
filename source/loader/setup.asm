@@ -38,14 +38,14 @@ rm_call: bits 32
 	go_unreal
 	push ecx
 
-	pusha
+	pushad
 	sti
 	jmp ax
 
 global rm_ret
 rm_ret: bits 16
 	cli
-	popa
+	popad
 
 	pop ecx
 	go_protected

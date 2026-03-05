@@ -1,5 +1,6 @@
 bits 16
 
+BPB_DRIVE_NUMBER   equ 0x24
 BPB_VOLUME_LABEL   equ 0x2B
 BPB_SECTS_PER_CLUS equ 0x0D
 BPB_TOTAL_SECTS    equ 0x13
@@ -41,6 +42,9 @@ boot_realmode:
 	mov ax, SECTBUF_SEG
 	mov es, ax
 
+	; Save the boot drive ID to read more sectors from later
+	mov [BPB_DRIVE_NUMBER], dl
+
 	cld ; Ensure string operations increment
 
 	; -------------------------------------------------------------------- ;
@@ -76,9 +80,9 @@ boot_realmode:
 	push bx    ; is the start of the data area, save it for later
 
 	; Setup the sector read to deposit data at 0x7E00
-	xchg ax, cx    ; We needed AX for the MUL before, for the LBA calc
-	xor bx, bx     ; Start of our sector buffer
-	call sector_rw ; Do the sector read
+	xchg ax, cx   ; We needed AX for the MUL before, for the LBA calc
+	xor bx, bx    ; Start of our sector buffer
+	call lba_read ; Do the sector read
 
 	; -------------------------------------------------------------------- ;
 
@@ -113,9 +117,9 @@ boot_realmode:
 	mov ax, [BPB_SECTS_PER_FAT]
 	cmp ax, SECTBUF_SIZ
 	mov si, err_space
-	ja  failure    ; More sectors than we have space for
-	xor bx, bx     ; Start of our sector buffer
-	call sector_rw ; Do the sector read
+	ja  failure   ; More sectors than we have space for
+	xor bx, bx    ; Start of our sector buffer
+	call lba_read ; Do the sector read
 
 	; -------------------------------------------------------------------- ;
 
@@ -134,9 +138,9 @@ boot_realmode:
 		sub ax, 2       ; First cluster has ID 2 in the FAT
 		mul bx          ; DX:AX = AX * BX (Convert to current sector)
 		add cx, ax      ; Offset into the data area, amount of sectors
-		mov ax, bx      ; Read one cluster from floppy (command on AX)
+		mov ax, bx      ; Read one cluster from floppy
 		xor bx, bx      ; Start of our cluster buffer
-		call sector_rw  ; Do the cluster read
+		call lba_read   ; Do the cluster read
 
 		; Advance the cluster buffer pointer
 		shl ax, 5  ; AH = 0, AL = sectors read, mult by 32
@@ -186,13 +190,12 @@ failure:
 	cli              ; Clear interrupts
 	hlt              ; Wait for interrupts (actual halt)
 
-; BPB base in CS
-; Command + response in AX
+; Count of sectors to read in AL
 ; Data buffer address in ES:BX
 ; Start LBA in CX
-; Clobbers CX and DX
-sector_rw:
-	push ax    ; Save command
+; Clobbers AX, CX and DX
+lba_read:
+	push ax    ; Save sector count
 	push bx    ; Save buffer address
 	mov ax, cx ; Need LBA in AX
 
@@ -216,15 +219,12 @@ sector_rw:
 	mov dh, dl   ; Up to 8 bits for head on DH, DL for drive ID
 
 	pop bx ; Restore buffer address
-	pop ax ; Restore command
+	pop ax ; Restore sector count
 
-	mov dl, ah   ; Command includes drive ID
-	sar dl, 1    ; Keep MSB but remove the LSB
-	and dl, 0xBF ; Remove duplicate MSB
-	and ah, 1    ; Keep lowest bit of AH as R/W bit
-	add ah, 2    ; AH = 2 for Read, AH = 3 for Write
+	mov dl, [BPB_DRIVE_NUMBER]
+	mov ah, 2 ; Read from the boot drive
+	int 0x13  ; Call BIOS to do disk IO
 
-	int 0x13    ; Call BIOS to do disk IO
 	mov si, err_read
 	jc  failure ; CF=1 means transfer failure
 	test ah, ah ; As well as non-zero response code
