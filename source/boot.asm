@@ -1,7 +1,6 @@
 bits 16
 
 BPB_DRIVE_NUMBER   equ 0x24
-BPB_VOLUME_LABEL   equ 0x2B
 BPB_SECTS_PER_CLUS equ 0x0D
 BPB_TOTAL_SECTS    equ 0x13
 
@@ -25,6 +24,8 @@ CLUSBUF_SEG equ 0x0800 ; Segment of memory area above boot sector (0x08000)
 ; which will direct execution here, skipping the data
 org 0x003E
 boot_realmode:
+	cli ; Clear interrupts during initial setup
+
 	; Setup the code segment to point to the BPB
 	jmp 0x7C0:.start
 	.start:
@@ -38,16 +39,17 @@ boot_realmode:
 	mov ss, ax
 	mov sp, 0x200
 
-	; Setup DS to point to our initial sector buffer
-	mov ax, SECTBUF_SEG
-	mov es, ax
-
 	; Save the boot drive ID to read more sectors from later
 	mov [BPB_DRIVE_NUMBER], dl
 
 	cld ; Ensure string operations increment
+	sti ; Re-enable interrupts
 
 	; -------------------------------------------------------------------- ;
+
+	; Setup ES to point to our initial sector buffer
+	mov ax, SECTBUF_SEG
+	mov es, ax
 
 	; If this value is 0 then, per the spec, the partition
 	; contains more than 65535 sectors. Our LBA16 would break
@@ -190,25 +192,45 @@ failure:
 	cli              ; Clear interrupts
 	hlt              ; Wait for interrupts (actual halt)
 
-; Count of sectors to read in AL
+; Count of sectors to read in AX
 ; Data buffer address in ES:BX
 ; Start LBA in CX
-; Clobbers AX, CX and DX
+; Clobbers AX, BX, CX, DX, SI
 lba_read:
-	push ax    ; Save sector count
-	push bx    ; Save buffer address
-	mov ax, cx ; Need LBA in AX
+	push es
+	.read:
+		push ax    ; Save sector count
+		push cx    ; Save LBA offset
+		mov ax, cx ; Put LBA in AX and do a read
+		call lba_read_one
 
-	mov bx, [cs:BPB_SECTS_PER_CYL]
+		; Advance the segment one sector
+		mov ax, es
+		add ax, 0x20
+		mov es, ax
+
+		pop cx ; Restore LBA offset
+		pop ax ; Restore sector count
+		inc cx ; Subsequent LBA next time
+		dec ax ; One less sector
+	jnz short .read
+
+	pop es
+	ret
+
+; Data buffer address in ES:BX
+; Start LBA in AX
+; Clobbers AX, BX, CX, DX, SI
+lba_read_one:
+	mov si, [cs:BPB_SECTS_PER_CYL]
 	xor dx, dx ; Zero the upper half of the dividend
-	div bx     ; AX div BX -> Q = AX, R = DX
-
+	div si     ; AX div SI -> Q = AX, R = DX
 	mov cx, dx ; Remainder was our sector
 	inc cx     ; Move to CX and increment
 
-	mov bx, [cs:BPB_HEAD_COUNT]
+	mov si, [cs:BPB_HEAD_COUNT]
 	xor dx, dx ; zero the upper half of the dividend
-	div bx     ; AX div BX -> Q = AX, R = DX
+	div si     ; AX div SI -> Q = AX, R = DX
 	; AX was the quotient from before, divide it again
 	; to get cylinder in AX and head in DX
 
@@ -217,18 +239,15 @@ lba_read:
 	and cl, 0x3F ; Leave out space for those two bits
 	or  cl, ah   ; 6 bits of sector with upper 2 bits of cylinder
 	mov dh, dl   ; Up to 8 bits for head on DH, DL for drive ID
+	mov dl, [cs: BPB_DRIVE_NUMBER]
 
-	pop bx ; Restore buffer address
-	pop ax ; Restore sector count
-
-	mov dl, [BPB_DRIVE_NUMBER]
-	mov ah, 2 ; Read from the boot drive
-	int 0x13  ; Call BIOS to do disk IO
-
-	mov si, err_read
-	jc  failure ; CF=1 means transfer failure
-	test ah, ah ; As well as non-zero response code
+	mov ax, 0x0201
+	int 0x13         ; Call the BIOS to read the sector
+	mov si, err_read ; Prepare error message in case we failed
+	jc  failure      ; CF=1 means transfer failure
+	test ah, ah      ; As well as non-zero response code
 	jnz failure
+
 	ret
 
 ; ============================================================================ ;

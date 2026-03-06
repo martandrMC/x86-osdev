@@ -27,9 +27,8 @@ $(VOLUME_IMAGE): $(BOOT_SECTOR) $(VOLUME_DIR)/loader.sys
 	mkfs.fat -F12 -n $(VOLUME_LABEL) -s2 $(VOLUME_IMAGE)
 	nasm -fbin $(BOOT_SECTOR) -o /dev/stdout | \
 		dd bs=1 seek=62 conv=notrunc of=$(VOLUME_IMAGE)
-	mcopy -i $(VOLUME_IMAGE) $^ ::/
-	mattrib -i $(VOLUME_IMAGE) +r +s -a \
-		$(foreach f,$^,::/$(shell basename $f))
+	mcopy -i $(VOLUME_IMAGE) $(VOLUME_DIR)/loader.sys ::/
+	mattrib -i $(VOLUME_IMAGE) +r +s -a ::/loader.sys
 
 GET_DEPS_C   = $(shell find $(SOURCE_DIR)/$1 -type f -name "*.c")
 GET_DEPS_ASM = $(shell find $(SOURCE_DIR)/$1 -type f -name "*.asm")
