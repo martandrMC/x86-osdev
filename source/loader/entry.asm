@@ -50,6 +50,15 @@ loader_entry: bits 16
 	mov ebp, esp
 	push ebp
 
+	xor eax, eax
+	extern _bss_end
+	mov ecx, _bss_end
+	extern _bss_start
+	mov edi, _bss_start
+	sub ecx, edi
+	shr ecx, 2
+	rep stosd
+
 	extern loader_main
 	jmp loader_main
 

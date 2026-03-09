@@ -1,6 +1,8 @@
 extern goto_protected
 extern goto_unreal
 
+section .real
+
 global clear_screen
 clear_screen: bits 32
 	lea ax, [.um_entry]
