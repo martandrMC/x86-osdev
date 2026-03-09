@@ -23,7 +23,7 @@ CLUSBUF_SEG equ 0x0800 ; Segment of memory area above boot sector (0x08000)
 ; the beginning of which is contained a jump instruction
 ; which will direct execution here, skipping the data
 org 0x003E
-boot_realmode:
+bootsect_entry:
 	cli ; Clear interrupts during initial setup
 
 	; Setup the code segment to point to the BPB
@@ -57,7 +57,7 @@ boot_realmode:
 	mov ax, [BPB_TOTAL_SECTS]
 	test ax, ax
 	mov si, err_fsbig
-	jz  failure
+	jz  boot_failure
 
 	; Calculate the base LBA of the Root Directory
 	; BPB_SECTS_PER_FAT * BPB_FAT_COUNT + BPB_RSRVD_COUNT
@@ -72,10 +72,10 @@ boot_realmode:
 	; Calculate the sector count based on the entry count
 	; 32 byte entries on 512 byte sectors = 16 per sector
 	mov cx, [BPB_ENTRY_COUNT]
-	shr cx, 4   ; div 2^x same as shift right by x
+	shr cx, 4        ; div 2^x same as shift right by x
 	cmp cx, SECTBUF_SIZ
 	mov si, err_space
-	ja  failure ; More sectors than we have space for
+	ja  boot_failure ; More sectors than we have space for
 
 	mov bx, ax ; Start of root dir ...
 	add bx, cx ; plus size of root dir ...
@@ -91,10 +91,10 @@ boot_realmode:
 	mov bx, [BPB_ENTRY_COUNT]
 	xor di, di      ; Directory entry at ES:DI
 	.search:
-	mov al, [es:di] ; Get first byte of file name
-	test al, al     ; Test if it's NUL, marking the end
+	mov al, [es:di]  ; Get first byte of file name
+	test al, al      ; Test if it's NUL, marking the end
 	mov si, err_found
-	jz  failure     ; Reached the end without succeeding
+	jz  boot_failure ; Reached the end without succeeding
 	push di
 		mov si, signature ; Sample file name string at DS:SI
 		mov cx, 12        ; Compare up to 12 chars (Name + Attrs)
@@ -105,7 +105,7 @@ boot_realmode:
 	dec bx     ; One less entry remaining
 	jnz short .search
 	mov si, err_found
-	jmp failure
+	jmp boot_failure
 
 	; -------------------------------------------------------------------- ;
 
@@ -119,9 +119,9 @@ boot_realmode:
 	mov ax, [BPB_SECTS_PER_FAT]
 	cmp ax, SECTBUF_SIZ
 	mov si, err_space
-	ja  failure   ; More sectors than we have space for
-	xor bx, bx    ; Start of our sector buffer
-	call lba_read ; Do the sector read
+	ja  boot_failure ; More sectors than we have space for
+	xor bx, bx       ; Start of our sector buffer
+	call lba_read    ; Do the sector read
 
 	; -------------------------------------------------------------------- ;
 
@@ -166,6 +166,9 @@ boot_realmode:
 	cmp di, 0xFF8
 	jb  short .next
 
+	; Dispose the TOS now that we've loaded the file
+	pop ax
+
 	; -------------------------------------------------------------------- ;
 
 	; Setup the segments for the second stage
@@ -178,7 +181,7 @@ boot_realmode:
 
 ; Message pointer in CS:SI
 ; Never returns
-failure:
+boot_failure:
 	mov ax, cs
 	mov ds, ax       ; Restore the correct segment for LODSB
 	mov ah, 0x0E     ; BIOS command for printing a character
@@ -244,9 +247,9 @@ lba_read_one:
 	mov ax, 0x0201
 	int 0x13         ; Call the BIOS to read the sector
 	mov si, err_read ; Prepare error message in case we failed
-	jc  failure      ; CF=1 means transfer failure
+	jc  boot_failure ; CF=1 means transfer boot_failure
 	test ah, ah      ; As well as non-zero response code
-	jnz failure
+	jnz boot_failure
 
 	ret
 

@@ -6,7 +6,6 @@ typedef unsigned int uint;
 
 asm_def void put_vga(uint offset, ushort value);
 asm_def void clear_screen(void);
-asm_def void rm_call(void (*real_ptr)(void));
 
 void print(const char *str) {
 	for(uint i = 0; ; i++) {
@@ -16,8 +15,8 @@ void print(const char *str) {
 	}
 }
 
-void loader_entry(void) {
-	rm_call(clear_screen);
+void loader_main(void) {
+	clear_screen();
 	print("Hellorld!");
 	asm volatile ("hlt");
 }

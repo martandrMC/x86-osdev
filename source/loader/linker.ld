@@ -2,9 +2,8 @@ OUTPUT_FORMAT(binary)
 
 SECTIONS {
 	. = 0;
-	.entry  : { *(.entry) }
-	.text   : { *(.text) }
-	.rodata : { *(.rodata) }
-	.data   : { *(.data) }
-	.bss    : { *(.bss) }
+	.real : { *(.real) *(.real*) }
+	ASSERT(. <= 0x10000, "Real mode section exceeds 64 kB")
+	.prot : { *(.text*) *(.rodata*) *(.data*) }
+	.bss (NOLOAD) : ALIGN(16) { *(.bss*) *(COMMON) }
 }

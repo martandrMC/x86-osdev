@@ -15,7 +15,7 @@ LD = ./local/tooling/bin/i686-elf-ld
 all: $(VOLUME_IMAGE)
 
 run: $(VOLUME_IMAGE)
-	GDK_SCALE=2 qemu-system-i386 -M accel=kvm -m 16 -display gtk \
+	GDK_SCALE=2 qemu-system-i386 -M accel=kvm -m 16 -display gtk  \
 		-boot order=a -drive format=raw,if=floppy,index=0,file=$<
 
 clean:
