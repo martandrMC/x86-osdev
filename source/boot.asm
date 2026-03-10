@@ -142,7 +142,9 @@ bootsect_entry:
 		add cx, ax      ; Offset into the data area, amount of sectors
 		mov ax, bx      ; Read one cluster from floppy
 		xor bx, bx      ; Start of our cluster buffer
+		push ax         ; Save cluster size for advancement
 		call lba_read   ; Do the cluster read
+		pop ax
 
 		; Advance the cluster buffer pointer
 		shl ax, 5  ; AH = 0, AL = sectors read, mult by 32
