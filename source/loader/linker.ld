@@ -2,7 +2,7 @@ OUTPUT_FORMAT(binary)
 
 SECTIONS {
 	. = 0;
-	.real : { *(.real) *(.real*) }
+	.real : { *(.real.entry) *(.real*) }
 	ASSERT(. <= 0x10000, "Real mode section exceeds 64 kB")
 
 	.prot : ALIGN(16) {

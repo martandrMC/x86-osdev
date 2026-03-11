@@ -19,7 +19,7 @@ STACK_SIZE  equ 0x07B00
 	db %2 >> 24 & 0xFF          ; base[31:24]
 %endmacro
 
-section .real.gdt
+section .real
 loader_gdt:
 	dw ._end - ._bgn - 1
 	dd LOADER_BASE + ._bgn
@@ -34,7 +34,7 @@ loader_gdt:
 	gdt_entry FLAT32, 0,           0xFFFFF,                 0b1001_0010_1100
 ._end:
 
-section .real
+section .real.entry
 loader_entry: bits 16
 	in al, 0x92
 	or al, 2
