@@ -12,10 +12,9 @@ BPB_ENTRY_COUNT    equ 0x11
 BPB_SECTS_PER_CYL  equ 0x18
 BPB_HEAD_COUNT     equ 0x1A
 
-; Sector buffer occupies the majority of the memory under our origin
-SECTBUF_SEG equ 0x0060 ; Starts at 0x00600
-SECTBUF_SIZ equ 59     ; 59 sectors = 29.5 kiB (0x7600 bytes)
-CLUSBUF_SEG equ 0x0800 ; Segment of memory area above boot sector (0x08000)
+BUFFER_SEG equ 0x0060 ; 0x00600 - 0x07BFF used to hold root entries and FAT
+BUFFER_MAX equ 59     ; Maximum of 59 sectors = 29.5 kiB (0x7600 bytes)
+STAGE2_SEG equ 0x0800 ; 0x08000 - 0x7FFFF used for loading stage two
 
 ; ============================================================================ ;
 
@@ -23,32 +22,36 @@ CLUSBUF_SEG equ 0x0800 ; Segment of memory area above boot sector (0x08000)
 ; the beginning of which is contained a jump instruction
 ; which will direct execution here, skipping the data
 org 0x003E
-bootsect_entry:
-	cli ; Clear interrupts during initial setup
+stage1_entry:
+	cli ; Disable interrupts during initial setup
 
-	; Setup the code segment to point to the BPB
+	; Setup the code segment to point to the BPB because later on
+	; both DS and ES will be unavailable and we'll need to use CS
 	jmp 0x7C0:.start
 	.start:
 
-	; Initially setup DS to also point to the BPB
-	mov ax, cs
-	mov ds, ax
-
-	; Setup the stack to occupy 0x07E00 - 0x08000
-	mov ax, 0x7E0
+	; Setup the stack to start at 0x7FFF
+	; We can safely use up to 0x200 bytes
+	xor ax, ax
 	mov ss, ax
-	mov sp, 0x200
+	mov sp, 0x8000
+
+	sti ; Re-enable interrupts; setup done
+
+	; -------------------------------------------------------------------- ;
+
+	cld ; Ensure string operations increment
 
 	; Save the boot drive ID to read more sectors from later
 	mov [BPB_DRIVE_NUMBER], dl
 
-	cld ; Ensure string operations increment
-	sti ; Re-enable interrupts
-
-	; -------------------------------------------------------------------- ;
+	; Initially setup DS to also point to the BPB in order to
+	; save on instruction size when accessing it (no segment override)
+	mov ax, cs
+	mov ds, ax
 
 	; Setup ES to point to our initial sector buffer
-	mov ax, SECTBUF_SEG
+	mov ax, BUFFER_SEG
 	mov es, ax
 
 	; If this value is 0 then, per the spec, the partition
@@ -56,7 +59,7 @@ bootsect_entry:
 	; if that was the case so abort.
 	mov ax, [BPB_TOTAL_SECTS]
 	test ax, ax
-	mov si, err_fsbig
+	mov si, err_fsfmt
 	jz  boot_failure
 
 	; Calculate the base LBA of the Root Directory
@@ -73,17 +76,16 @@ bootsect_entry:
 	; 32 byte entries on 512 byte sectors = 16 per sector
 	mov cx, [BPB_ENTRY_COUNT]
 	shr cx, 4        ; div 2^x same as shift right by x
-	cmp cx, SECTBUF_SIZ
-	mov si, err_space
+	cmp cx, BUFFER_MAX
+	mov si, err_fsfmt
 	ja  boot_failure ; More sectors than we have space for
 
 	mov bx, ax ; Start of root dir ...
 	add bx, cx ; plus size of root dir ...
-	push bx    ; is the start of the data area, save it for later
+	push bx    ; ... is the start of the data area, save it for later
 
 	; Setup the sector read to deposit data at 0x7E00
 	xchg ax, cx   ; We needed AX for the MUL before, for the LBA calc
-	xor bx, bx    ; Start of our sector buffer
 	call lba_read ; Do the sector read
 
 	; -------------------------------------------------------------------- ;
@@ -103,7 +105,7 @@ bootsect_entry:
 	pop di     ; Restore DI (back to the start of the entry)
 	add di, 32 ; Advance to the next entry
 	dec bx     ; One less entry remaining
-	jnz short .search
+	jnz .search
 	mov si, err_found
 	jmp boot_failure
 
@@ -117,23 +119,22 @@ bootsect_entry:
 	; Then read BPB_SECTS_PER_FAT sectors (the whole FAT) into our buffer
 	mov cx, [BPB_RSRVD_COUNT]
 	mov ax, [BPB_SECTS_PER_FAT]
-	cmp ax, SECTBUF_SIZ
-	mov si, err_space
+	cmp ax, BUFFER_MAX
+	mov si, err_fsfmt
 	ja  boot_failure ; More sectors than we have space for
-	xor bx, bx       ; Start of our sector buffer
 	call lba_read    ; Do the sector read
 
 	; -------------------------------------------------------------------- ;
 
 	mov ax, es
-	mov ds, ax          ; Sector buffer with FAT now under DS
-	mov ax, CLUSBUF_SEG ; Prepare new cluster buffer for second stage
-	mov es, ax          ; Cluster buffer now on ES for sector_rw to use
+	mov ds, ax         ; Sector buffer with FAT now under DS
+	mov ax, STAGE2_SEG ; Prepare new cluster buffer for second stage
+	mov es, ax         ; Cluster buffer now on ES for lba_read to use
 	.next:
 
 		; Setup and read the next cluster into the buffer
 		mov bx, sp      ; Read the TOS into CX, which is the ...
-		mov cx, [ss:bx] ; start of the data area we had saved
+		mov cx, [ss:bx] ; ... start of the data area we had saved
 		mov bl, [cs:BPB_SECTS_PER_CLUS]
 		xor bh, bh      ; Upcast to 2 bytes
 		mov ax, di      ; Get our current cluster
@@ -141,7 +142,6 @@ bootsect_entry:
 		mul bx          ; DX:AX = AX * BX (Convert to current sector)
 		add cx, ax      ; Offset into the data area, amount of sectors
 		mov ax, bx      ; Read one cluster from floppy
-		xor bx, bx      ; Start of our cluster buffer
 		push ax         ; Save cluster size for advancement
 		call lba_read   ; Do the cluster read
 		pop ax
@@ -166,7 +166,7 @@ bootsect_entry:
 
 	; Repeat until the end marker was reached
 	cmp di, 0xFF8
-	jb  short .next
+	jb  .next
 
 	; Dispose the TOS now that we've loaded the file
 	pop ax
@@ -174,40 +174,81 @@ bootsect_entry:
 	; -------------------------------------------------------------------- ;
 
 	; Setup the segments for the second stage
-	mov ax, CLUSBUF_SEG
+	mov ax, STAGE2_SEG
 	mov ds, ax
-	mov es, ax
-	jmp CLUSBUF_SEG:0 ; Jump to second stage
+	jmp STAGE2_SEG:0 ; Jump to second stage
 
 ; ============================================================================ ;
 
 ; Message pointer in CS:SI
 ; Never returns
 boot_failure:
+	; Restore the correct segment for LODSB
 	mov ax, cs
-	mov ds, ax       ; Restore the correct segment for LODSB
-	mov ah, 0x0E     ; BIOS command for printing a character
-	.print:
-		lodsb        ; Load the character into AL
-		test al, al  ; Check if it's NUL
-		jz  .exit    ; Stop looping
-		int 0x10     ; Call the BIOS to print it
-	jmp short .print ; Repeat
+	mov ds, ax
+
+	; BIOS command for printing a character
+	mov ah, 0x0E
+
+	.repeat:
+		lodsb       ; Load the character into AL
+		test al, al ; Check if it's NUL
+		jz  .exit   ; If so, we're done
+		int 0x10    ; Call the BIOS to print it
+	jmp .repeat
 	.exit:
-	cli              ; Clear interrupts
-	hlt              ; Wait for interrupts (actual halt)
+
+	cli
+	hlt
 
 ; Count of sectors to read in AX
-; Data buffer address in ES:BX
+; Data buffer address in ES:0000
 ; Start LBA in CX
 ; Clobbers AX, BX, CX, DX, SI
 lba_read:
 	push es
+	xor bx, bx
 	.read:
 		push ax    ; Save sector count
 		push cx    ; Save LBA offset
 		mov ax, cx ; Put LBA in AX and do a read
-		call lba_read_one
+		
+		mov si, [cs:BPB_SECTS_PER_CYL]
+		xor dx, dx ; Zero the upper half of the dividend
+		div si     ; AX div SI -> Q = AX, R = DX
+		mov cx, dx ; Remainder was our sector
+		inc cx     ; Move to CX and increment
+
+		mov si, [cs:BPB_HEAD_COUNT]
+		xor dx, dx ; zero the upper half of the dividend
+		div si     ; AX div SI -> Q = AX, R = DX
+		; AX was the quotient from before, divide it again
+		; to get cylinder in AX and head in DX
+
+		mov ch, al   ; Lower 8 bits of cylinder go to CH
+		shl ah, 6    ; Keep only the next two bits of cylinder
+		and cl, 0x3F ; Leave out space for those two bits
+		or  cl, ah   ; 6 bits of sector with upper 2 bits of cylinder
+		mov dh, dl   ; Up to 8 bits for head on DH, DL for drive ID
+		mov dl, [cs:BPB_DRIVE_NUMBER]
+
+		mov si, 3
+		.retry:
+		push si          ; Save attempts counter (some BIOSes clobber SI)
+			mov ax, 0x0201
+			int 0x13     ; Call the BIOS to read the sector
+			jnc .success ; CF=0 means the read succeeded
+
+			xor ax, ax ; Otherwise, the read failed
+			int 0x13   ; Reset the disk system
+			pop si     ; Restore retries counter ...
+			dec si     ; ... and decrement it
+			jnz .retry ; Retry if we have attempts remaining
+
+			mov si, err_read ; Otherwise, setup the message ...
+			jmp boot_failure ; ... and error out
+		.success:
+		pop si ; Discard retries counter
 
 		; Advance the segment one sector
 		mov ax, es
@@ -218,52 +259,19 @@ lba_read:
 		pop ax ; Restore sector count
 		inc cx ; Subsequent LBA next time
 		dec ax ; One less sector
-	jnz short .read
+	jnz .read
 
 	pop es
-	ret
-
-; Data buffer address in ES:BX
-; Start LBA in AX
-; Clobbers AX, BX, CX, DX, SI
-lba_read_one:
-	mov si, [cs:BPB_SECTS_PER_CYL]
-	xor dx, dx ; Zero the upper half of the dividend
-	div si     ; AX div SI -> Q = AX, R = DX
-	mov cx, dx ; Remainder was our sector
-	inc cx     ; Move to CX and increment
-
-	mov si, [cs:BPB_HEAD_COUNT]
-	xor dx, dx ; zero the upper half of the dividend
-	div si     ; AX div SI -> Q = AX, R = DX
-	; AX was the quotient from before, divide it again
-	; to get cylinder in AX and head in DX
-
-	mov ch, al   ; Lower 8 bits of cylinder go to CH
-	shl ah, 6    ; Keep only the next two bits of cylinder
-	and cl, 0x3F ; Leave out space for those two bits
-	or  cl, ah   ; 6 bits of sector with upper 2 bits of cylinder
-	mov dh, dl   ; Up to 8 bits for head on DH, DL for drive ID
-	mov dl, [cs: BPB_DRIVE_NUMBER]
-
-	mov ax, 0x0201
-	int 0x13         ; Call the BIOS to read the sector
-	mov si, err_read ; Prepare error message in case we failed
-	jc  boot_failure ; CF=1 means transfer boot_failure
-	test ah, ah      ; As well as non-zero response code
-	jnz boot_failure
-
 	ret
 
 ; ============================================================================ ;
 
 signature: db "LOADER  SYS", 0x05
-err_fsbig: db "FS too large to be addressed!", 0
-err_space: db "Not enough space for FS tables!", 0
-err_found: db "Target file not found!", 0
+err_fsfmt: db "Invalid FS parameters!", 0
+err_found: db "Stage 2 not found!", 0
 err_read:  db "Disk read error!", 0
 
 ; Pad with zeros and append bootable marker
-; Total binary should be exactly 512 bytes long
+; Total binary should be exactly 450 bytes long
 times 448 + $$ - $ db 0
 dw 0xAA55

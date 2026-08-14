@@ -23,8 +23,9 @@ clean:
 
 ### Whatever all this is ###
 $(VOLUME_IMAGE): $(BOOT_SECTOR) $(VOLUME_DIR)/loader.sys
+	dirname $@ | xargs mkdir -p
 	dd bs=1K count=1440 if=/dev/zero of=$(VOLUME_IMAGE)
-	mkfs.fat -F12 -n $(VOLUME_LABEL) -s2 $(VOLUME_IMAGE)
+	mkfs.fat -F12 -f1 -s2 -r32 -n $(VOLUME_LABEL) $(VOLUME_IMAGE)
 	nasm -fbin $(BOOT_SECTOR) -o /dev/stdout | \
 		dd bs=1 seek=62 conv=notrunc of=$(VOLUME_IMAGE)
 	mcopy -i $(VOLUME_IMAGE) $(VOLUME_DIR)/loader.sys ::/
