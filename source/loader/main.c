@@ -1,22 +1,19 @@
-#define asm_def __attribute__((cdecl)) extern
+#include "ports.h"
 
-typedef unsigned char uchar;
-typedef unsigned short ushort;
-typedef unsigned int uint;
+unsigned short *vga = (unsigned short *) 0xB8000;
+const char message[] = "Hellorld!";
 
-asm_def void put_vga(uint offset, ushort value);
-asm_def void clear_screen(void);
-
-void print(const char *str) {
-	for(uint i = 0; ; i++) {
-		uchar c = str[i];
-		if(c == '\0') break;
-		put_vga(i, c | (0x0E << 8));
-	}
+void disable_cursor(void) {
+	outb(0x3D4, 0x0A);
+	u8 curr = inb(0x3D5);
+	outb(0x3D5, curr | (1 << 5));
 }
 
 void loader_main(void) {
-	clear_screen();
-	print("Hellorld!");
-	asm volatile ("hlt");
+	disable_cursor();
+
+	for(u32 i = 0; i < 80 * 25; i++) vga[i] = 0x1F00;
+	for(u32 i = 0; i < sizeof message; i++) vga[i] |= message[i];
+
+	for(;;) asm volatile("hlt");
 }

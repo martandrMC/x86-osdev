@@ -22,7 +22,7 @@ STAGE2_SEG equ 0x0800 ; 0x08000 - 0x7FFFF used for loading stage two
 ; the beginning of which is contained a jump instruction
 ; which will direct execution here, skipping the data
 org 0x003E
-stage1_entry:
+bootsect_entry:
 	cli ; Disable interrupts during initial setup
 
 	; Setup the code segment to point to the BPB because later on
@@ -173,10 +173,9 @@ stage1_entry:
 
 	; -------------------------------------------------------------------- ;
 
-	; Setup the segments for the second stage
-	mov ax, STAGE2_SEG
-	mov ds, ax
-	jmp STAGE2_SEG:0 ; Jump to second stage
+	; Setup for transition to stage two
+	mov dl, [cs:BPB_DRIVE_NUMBER]
+	jmp STAGE2_SEG:0 ; Far-jump to second stage
 
 ; ============================================================================ ;
 

@@ -1,117 +1,80 @@
-LOADER_BASE equ 0x08000
-LOADER_SIZE equ 0x78000
-STACK_BASE  equ 0x00500
-STACK_SIZE  equ 0x07B00
+; Tell NASM .real.bss is a bss-like section
+section .real.bss nobits
 
-; gdt_entry label, base, limit, access+flags
-%macro gdt_entry 4
-	.%1:
-	SEG_%1 equ .%1 - ._bgn
-	dw %3 & 0xFFFF              ; limit[15:0]
-	dw %2 & 0xFFFF              ; base[15:0]
-	db %2   >> 16 & 0xFF        ; base[23:16]
-	db (%4) >>  4 & 0xFF        ; access[7:0]
-	%assign flag (%4) & 0xF     ; flag[3:0]
-	%assign ulim %3 >> 16 & 0xF ; limit[19:16]
-	db flag << 4 | ulim         ; {flag, ulim}
-	%undef flag
-	%undef ulim
-	db %2 >> 24 & 0xFF          ; base[31:24]
-%endmacro
+bits 16
+section .real.text
 
-section .real
-loader_gdt:
-	dw ._end - ._bgn - 1
-	dd LOADER_BASE + ._bgn
-._bgn:
-	.null: dq 0
-	gdt_entry CODE16, LOADER_BASE, 0x0FFFF,                 0b1001_1010_0000
-	gdt_entry STAK16, STACK_BASE,  0x0FFFF,                 0b1001_0010_0000
+; Clobbers AX, CX, DI, ES
+extern _real_bss_start
+extern _real_bss_end
+clear_real_bss:
+	; Heap shares ~32k block with the stack
+	; Stage 1 set SS to 0 so that both
+	; structures work seamlessly with PM32
+	mov ax, ss
+	mov es, ax
 
-	gdt_entry CODE32, LOADER_BASE, (LOADER_SIZE - 1) >> 12, 0b1001_1010_1100
-	gdt_entry STAK32, STACK_BASE,   STACK_SIZE  - 1,        0b1001_0010_0100
-	gdt_entry DATA32, LOADER_BASE, (LOADER_SIZE - 1) >> 12, 0b1001_0010_1100
-	gdt_entry FLAT32, 0,           0xFFFFF,                 0b1001_0010_1100
-._end:
+	; Get the start and end addresses
+	; The size is always a multiple of 4 bytes
+	lea ax, [_real_bss_start]
+	lea cx, [_real_bss_end]
+
+	mov di, ax ; STOSW uses ES:DI as its address
+	sub cx, ax ; REP uses CX as its counter
+	shr cx, 1  ; Total words in .real.bss
+	xor ax, ax ; The value to write to memory
+	rep stosw  ; CISC moment (memset)
+
+	ret
 
 section .real.entry
-loader_entry: bits 16
-	in al, 0x92
-	or al, 2
+extern setup_gdt
+extern goto_pm32
+loader_entry:
+	; Tiny-ish memory model
+	; Stage 1 far-jumped to STAGE2_SEG:0 and so
+	; CS contains the base for our 64k block
+	; Linker script needs to match with stage 1
+	mov ax, cs
+	mov ds, ax
+
+	call clear_real_bss
+
+	; TODO: More foolproof A20
+	in  al, 0x92
+	or  al, 2
 	out 0x92, al
 
-	lgdt [loader_gdt]
+	call setup_gdt
 
-	lea ax, [.pm_entry]
-	jmp goto_protected
-	.pm_entry: bits 32
+	; Technically we use ptr_farjmp (part of .bss) before
+	; it gets cleared later on, but new values are written
+	; to its entirety before it's used so it's ok
+	lea ebx, [pm32_start]
+	jmp goto_pm32
 
-	mov esp, STACK_SIZE
-	mov ebp, esp
-	push ebp
+bits 32
+section .text
 
-	xor eax, eax
-	extern _bss_end
-	mov ecx, _bss_end
-	extern _bss_start
-	mov edi, _bss_start
-	sub ecx, edi
+; Clobbers EAX, ECX, EDI
+extern _prot_bss_start
+extern _prot_bss_end
+clear_prot_bss:
+	; Same story as with clear_real_bss except now
+	; we get to use STOSD and the 32 bit registers
+
+	lea eax, [_prot_bss_start]
+	lea ecx, [_prot_bss_end]
+
+	mov edi, eax
+	sub ecx, eax
 	shr ecx, 2
+	xor eax, eax
 	rep stosd
 
-	extern loader_main
-	jmp loader_main
+	ret
 
-global goto_protected
-goto_protected: bits 16
-	cli
-
-	mov edx, cr0
-	or  edx, 1
-	mov cr0, edx
-
-	jmp SEG_CODE32:.pm32
-	.pm32: bits 32
-
-	mov dx, SEG_STAK32
-	mov ss, dx
-
-	mov dx, SEG_DATA32
-	mov ds, dx
-	mov es, dx
-
-	mov dx, SEG_FLAT32
-	mov fs, dx
-	mov gs, dx
-
-	jmp ax
-
-global goto_unreal
-goto_unreal: bits 32
-	jmp SEG_CODE16:.pm16
-	.pm16: bits 16
-
-	mov dx, SEG_STAK16
-	mov ss, dx
-
-	mov edx, cr0
-	and edx, ~1
-	mov cr0, edx
-
-	jmp (LOADER_BASE >> 4):.rm
-	.rm:
-
-	mov dx, (STACK_BASE >> 4)
-	mov ss, dx
-
-	mov dx, (LOADER_BASE >> 4)
-	mov ds, dx
-	mov es, dx
-
-	xor dx, dx
-	mov fs, dx
-	mov gs, dx
-
-	sti
-
-	jmp ax
+extern loader_main
+pm32_start:
+	call clear_prot_bss
+	call loader_main
