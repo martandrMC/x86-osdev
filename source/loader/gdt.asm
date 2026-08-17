@@ -45,12 +45,12 @@ goto_pm32:
 
 	; Using DS, we can now access .bss section to populate
 	; our second far jump to the flat CS and enter C code
-	mov [ptr_farjmp.off], ebx
-	mov word [ptr_farjmp.seg], seg_code
-	jmp far [ptr_farjmp]
+	mov [jmp_buffer.off], ebx
+	mov word [jmp_buffer.seg], seg_code
+	jmp far [jmp_buffer]
 
 section .bss
-ptr_farjmp:
+jmp_buffer:
 	.off: resd 1
 	.seg: resw 1
 

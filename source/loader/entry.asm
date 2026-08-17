@@ -1,19 +1,17 @@
-; Tell NASM .real.bss is a bss-like section
-section .real.bss nobits
-
 bits 16
 section .real.text
 
-; Clobbers AX, CX, DI, ES
+struc bios_data
+	.map_addr resd 1
+	.map_size resw 1
+	.disk_id  resb 1
+endstruc
+
+; Heap segment in ES
+; Clobbers AX, CX, DI
 extern _real_bss_start
 extern _real_bss_end
 clear_real_bss:
-	; Heap shares ~32k block with the stack
-	; Stage 1 set SS to 0 so that both
-	; structures work seamlessly with PM32
-	mov ax, ss
-	mov es, ax
-
 	; Get the start and end addresses
 	; The size is always a multiple of 4 bytes
 	lea ax, [_real_bss_start]
@@ -27,8 +25,16 @@ clear_real_bss:
 
 	ret
 
+; Clobbers AL
+enable_a20:
+	in  al, 0x92
+	or  al, 2
+	out 0x92, al
+	ret
+
 section .real.entry
 extern setup_gdt
+extern collect_e820
 extern goto_pm32
 loader_entry:
 	; Tiny-ish memory model
@@ -38,20 +44,30 @@ loader_entry:
 	mov ax, cs
 	mov ds, ax
 
+	; Heap shares ~32k block with the stack
+	; Stage 1 set SS to 0 so that both
+	; structures work seamlessly with PM32
+	mov ax, ss
+	mov es, ax
+
+	; mov [es:collected_data + bios_data.disk_id], dl
+
 	call clear_real_bss
-
-	; TODO: More foolproof A20
-	in  al, 0x92
-	or  al, 2
-	out 0x92, al
-
+	call enable_a20
 	call setup_gdt
+
+	call collect_e820
+	mov [es:collected_data + bios_data.map_addr], bx
+	mov [es:collected_data + bios_data.map_size], ax
 
 	; Technically we use ptr_farjmp (part of .bss) before
 	; it gets cleared later on, but new values are written
 	; to its entirety before it's used so it's ok
 	lea ebx, [pm32_start]
 	jmp goto_pm32
+
+section .real.bss
+collected_data: resb bios_data_size
 
 bits 32
 section .text
@@ -77,4 +93,11 @@ clear_prot_bss:
 extern loader_main
 pm32_start:
 	call clear_prot_bss
+
+	lea eax, [collected_data]
+	push eax
 	call loader_main
+	add esp, 4
+
+	.die: hlt
+	jmp .die

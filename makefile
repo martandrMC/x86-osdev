@@ -46,14 +46,14 @@ GET_OBJS = $(patsubst $(SOURCE_DIR)%.c,$(BUILD_DIR)%.o,$(call GET_DEPS_C,$1)) \
 	$(patsubst $(SOURCE_DIR)%.asm,$(BUILD_DIR)%.o,$(call GET_DEPS_ASM,$1))
 
 $(VOLUME_DIR)/loader.sys: $(call GET_OBJS,loader)
-	dirname $@ | xargs mkdir -p
+	@dirname $@ | xargs mkdir -p
 	$(LD) -T $(SOURCE_DIR)/loader/linker.ld $(LD_FLAGS) -o $@ $^
 
 ### Generic Compilation Rules ###
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.asm
-	dirname $@ | xargs mkdir -p
-	nasm -felf32 -o $@ $<
+	@dirname $@ | xargs mkdir -p
+	nasm -felf32 -w-zeroing -o $@ $<
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
-	dirname $@ | xargs mkdir -p
+	@dirname $@ | xargs mkdir -p
 	$(CC) $(CC_FLAGS) -I$(INCLUDE_DIR) -c -o $@ $<
