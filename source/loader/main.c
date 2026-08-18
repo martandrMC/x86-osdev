@@ -36,29 +36,35 @@ void print_to_vga(const char *str) {
 }
 
 typedef struct map_entry {
-	u32 base_flags;
-	u32 size;
+	u32 base, size, type;
 } map_entry_t;
 
 typedef struct bios_data {
 	map_entry_t *map_entries;
 	u16 map_entry_count;
-	u8  boot_disk_id;
+	u16 boot_disk_id;
 } bios_data_t;
+
+static const char *map_type_names[] = {
+	"Invalid", "Usable", "Reserved",
+	"ACPI Data", "ACPI NVS", "Bad Mem"
+};
 
 cdecl void loader_main(bios_data_t *collected_data) {
 	disable_cursor();
 	for(u32 i = 0; i < 80 * 25; i++) vga[i] = 0x1F00;
 
 	for(u32 i = 0; i < collected_data->map_entry_count; i++) {
-		u32 size = collected_data->map_entries[i].size;
-		u32 base = collected_data->map_entries[i].base_flags & ~0xF;
-		u8 flags = collected_data->map_entries[i].base_flags &  0xF;
-		print_to_vga(num_to_hex(8, base));
-		print_to_vga(" ");
-		print_to_vga(num_to_hex(8, size));
-		print_to_vga(" ");
-		print_to_vga(num_to_hex(2, flags));
+		print_to_vga("Base: ");
+		print_to_vga(num_to_hex(8, collected_data->map_entries[i].base));
+		print_to_vga("  ");
+		print_to_vga("Size: ");
+		print_to_vga(num_to_hex(8, collected_data->map_entries[i].size));
+		print_to_vga("  ");
+
+		u32 type = collected_data->map_entries[i].type;
+		if(type > 5) type = 0;
+		print_to_vga(map_type_names[type]);
 		print_to_vga("\r\n");
 	}
 }

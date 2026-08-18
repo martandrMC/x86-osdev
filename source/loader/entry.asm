@@ -4,7 +4,7 @@ section .real.text
 struc bios_data
 	.map_addr resd 1
 	.map_size resw 1
-	.disk_id  resb 1
+	.disk_id  resw 1
 endstruc
 
 ; Heap segment in ES
@@ -50,17 +50,18 @@ loader_entry:
 	mov ax, ss
 	mov es, ax
 
-	; mov [es:collected_data + bios_data.disk_id], dl
-
 	call clear_real_bss
-	call enable_a20
-	call setup_gdt
+
+	mov [es:collected_data + bios_data.disk_id], dl
 
 	call collect_e820
 	mov [es:collected_data + bios_data.map_addr], bx
 	mov [es:collected_data + bios_data.map_size], ax
 
-	; Technically we use ptr_farjmp (part of .bss) before
+	call enable_a20
+	call setup_gdt
+
+	; Technically we use jmp_buffer (part of .bss) before
 	; it gets cleared later on, but new values are written
 	; to its entirety before it's used so it's ok
 	lea ebx, [pm32_start]

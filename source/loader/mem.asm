@@ -8,8 +8,9 @@ struc given_e820
 endstruc
 
 struc stored_e820
-	.base_flags: resd 1
-	.size:       resd 1
+	.base: resd 1
+	.size: resd 1
+	.type: resd 1
 endstruc
 
 ; Heap segment in DS and ES
@@ -42,14 +43,14 @@ get_e820_entry:
 	mov bx, stored_e820_size
 	call arena_alloc
 
-	xor eax, eax
-	mov al,  [e820_buffer + given_e820.type]
-	and al, 0x0F
-	or  eax, [e820_buffer + given_e820.base]
-	mov [bx + stored_e820.base_flags], eax
+	mov eax, [e820_buffer + given_e820.base]
+	mov [bx + stored_e820.base], eax
 
 	mov eax, [e820_buffer + given_e820.size]
 	mov [bx + stored_e820.size], eax
+
+	mov eax, [e820_buffer + given_e820.type]
+	mov [bx + stored_e820.type], eax
 
 	pop ebx
 	pop ax
