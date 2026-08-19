@@ -10,13 +10,14 @@ BOOT_SECTOR  = $(SOURCE_DIR)/boot.asm
 CC = ./local/tooling/bin/i686-elf-gcc
 LD = ./local/tooling/bin/i686-elf-ld
 
-override CC_FLAGS_COM += -m32 -ffreestanding -fno-pie -Wall -Wextra -pedantic
+override CC_FLAGS_COM += -Wall -Wextra -pedantic \
+	-ffreestanding -fno-pie -std=c99
 override LD_FLAGS     += -m elf_i386 -nostdlib -N
 
 ### User Rules ###
 .PHONY: debug release clean run
 
-debug: CC_FlAGS = $(CC_FLAGS_COM) -O0
+debug: CC_FLAGS = $(CC_FLAGS_COM) -O0
 debug: $(VOLUME_IMAGE)
 
 release: CC_FLAGS = $(CC_FLAGS_COM) -Werror -O2

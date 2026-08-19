@@ -7,12 +7,12 @@ SECTIONS {
 	.real 0 : AT(_loader_base) {
 		_real_start = .; *(.real.entry) *(.real.text*)
 		. = ALIGN(4); *(.real.data*)
-		. = ALIGN(4); _real_end = .;
+		. = ALIGN(2); _real_end = .;
 	}
 
 	.real.bss _heap_base (NOLOAD) : {
 		_real_bss_start = .; *(.real.bss*)
-		. = ALIGN(4); _real_bss_end = .;
+		. = ALIGN(2); _real_bss_end = .;
 	}
 
 	_real_size = _real_end - _real_start;

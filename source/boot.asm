@@ -1,16 +1,15 @@
 bits 16
 
-BPB_DRIVE_NUMBER   equ 0x24
-BPB_SECTS_PER_CLUS equ 0x0D
 BPB_TOTAL_SECTS    equ 0x13
-
-BPB_RSRVD_COUNT    equ 0x0E
-BPB_SECTS_PER_FAT  equ 0x16
-BPB_FAT_COUNT      equ 0x10
-BPB_ENTRY_COUNT    equ 0x11
-
 BPB_SECTS_PER_CYL  equ 0x18
 BPB_HEAD_COUNT     equ 0x1A
+BPB_DRIVE_NUMBER   equ 0x24
+
+BPB_RSRVD_COUNT    equ 0x0E
+BPB_FAT_COUNT      equ 0x10
+BPB_SECTS_PER_CLUS equ 0x0D
+BPB_SECTS_PER_FAT  equ 0x16
+BPB_ENTRY_COUNT    equ 0x11
 
 BUFFER_SEG equ 0x0060 ; 0x00600 - 0x07BFF used to hold root entries and FAT
 BUFFER_MAX equ 59     ; Maximum of 59 sectors = 29.5 kiB (0x7600 bytes)
@@ -173,8 +172,8 @@ bootsect_entry:
 
 	; -------------------------------------------------------------------- ;
 
-	; Setup for transition to stage two
-	mov dl, [cs:BPB_DRIVE_NUMBER]
+	; Transition to stage two
+	mov dx, cs       ; Segment for BPB access
 	jmp STAGE2_SEG:0 ; Far-jump to second stage
 
 ; ============================================================================ ;
