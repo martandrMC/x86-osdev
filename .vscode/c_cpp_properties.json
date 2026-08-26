@@ -4,7 +4,8 @@
 		{
 			"name": "Linux",
 			"includePath": [
-				"${workspaceFolder}/include/"
+				"${workspaceFolder}/local/tooling/lib/gcc/i686-elf/7.1.0/include",
+				"${workspaceFolder}/include"
 			],
 			"compilerPath": "${workspaceFolder}/local/tooling/bin/i686-elf-gcc",
 			"compilerArgs": ["-ffreestanding", "-Wall", "-Wextra", "-pedantic"],

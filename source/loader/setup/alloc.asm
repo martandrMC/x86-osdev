@@ -5,22 +5,19 @@ section .real.text
 ; Returned pointer in BX
 global arena_alloc
 arena_alloc:
-	xchg bx, [cs:arena_ptr] ; Bring old pointer to AX
+	push ax
+	xor ax, ax
+	mov al, 3
+
+	; Round up size to next multiple of 4
+	add bx, ax ; Bump up the size by 3
+	not ax     ; Invert to mask out low bits
+	and bx, ax ; Correct the overshoot
+
+	xchg bx, [cs:arena_ptr] ; Bring old pointer to BX
 	add [cs:arena_ptr], bx  ; Add it back onto offset
-	ret
 
-; Power-of-two to align by in CL
-; Clobbers BX
-global arena_align
-arena_align:
-	mov bx, 1  ; Start with 1
-	shl bx, cl ; Shift it up CL bits
-	dec bx     ; Now have CL ones
-
-	add [cs:arena_ptr], bx ; Bump up the pointer
-	not bx                 ; Invert to mask out low bits
-	and [cs:arena_ptr], bx ; Correct the overshoot
-
+	pop ax
 	ret
 
 section .real.data

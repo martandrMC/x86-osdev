@@ -1,5 +1,6 @@
 #include "defs.h"
 #include "ports.h"
+#include "library/printf.h"
 #include <stdint.h>
 
 void disable_cursor(void) {
@@ -60,44 +61,33 @@ static const char *map_type_names[] = {
 	"ACPI Data", "ACPI NVS", "Bad Mem"
 };
 
-cdecl void loader_main(bios_data_t *collected_data) {
+void loader_main(bios_data_t *collected_data) {
 	disable_cursor();
 	for(int i = 0; i < 80 * 25; i++) vga[i] = 0x1F00;
 
+	char buffer[80];
 	for(int i = 0; i < collected_data->map_entry_count; i++) {
-		print_to_vga("Base: ");
-		print_to_vga(num_to_hex(8, collected_data->map_entries[i].base));
-		print_to_vga(" - ");
-		print_to_vga("Size: ");
-		print_to_vga(num_to_hex(8, collected_data->map_entries[i].size));
-		print_to_vga(" - ");
-
 		uint32_t type = collected_data->map_entries[i].type;
 		if(type > 5) type = 0;
-		print_to_vga(map_type_names[type]);
-		print_to_vga("\r\n");
+		snprintf(buffer, 80,
+			"Base: %08X - Size: %08X - %s\r\n",
+			collected_data->map_entries[i].base,
+			collected_data->map_entries[i].size,
+			map_type_names[type]);
+		print_to_vga(buffer);
 	}
 	print_to_vga("\r\n");
 
-	print_to_vga(num_to_hex(4, collected_data->bpb_data->total_sects));
-	print_to_vga(" ");
-	print_to_vga(num_to_hex(4, collected_data->bpb_data->sects_per_cyl));
-	print_to_vga(" ");
-	print_to_vga(num_to_hex(2, collected_data->bpb_data->head_count));
-	print_to_vga(" ");
-	print_to_vga(num_to_hex(2, collected_data->bpb_data->boot_drive_id));
-	print_to_vga("\r\n");
-
-	print_to_vga(num_to_hex(4, collected_data->bpb_data->reserved_count));
-	print_to_vga(" ");
-	print_to_vga(num_to_hex(2, collected_data->bpb_data->fat_count));
-	print_to_vga(" ");
-	print_to_vga(num_to_hex(2, collected_data->bpb_data->sects_per_clus));
-	print_to_vga(" ");
-	print_to_vga(num_to_hex(4, collected_data->bpb_data->sects_per_fat));
-	print_to_vga(" ");
-	print_to_vga(num_to_hex(4, collected_data->bpb_data->entry_count));
-	print_to_vga("\r\n");
-
-	print_to_vga("\r\n");
+	snprintf(buffer, 80,
+		"%04X %04X %02X %02X\r\n%04X %02X %02X %04X %04X\r\n",
+		collected_data->bpb_data->total_sects,
+		collected_data->bpb_data->sects_per_cyl,
+		collected_data->bpb_data->head_count,
+		collected_data->bpb_data->boot_drive_id,
+		collected_data->bpb_data->reserved_count,
+		collected_data->bpb_data->fat_count,
+		collected_data->bpb_data->sects_per_clus,
+		collected_data->bpb_data->sects_per_fat,
+		collected_data->bpb_data->entry_count);
+	print_to_vga(buffer);
 }

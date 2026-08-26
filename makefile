@@ -9,6 +9,9 @@ BOOT_SECTOR  = $(SOURCE_DIR)/boot.asm
 
 CC = ./local/tooling/bin/i686-elf-gcc
 LD = ./local/tooling/bin/i686-elf-ld
+OC = ./local/tooling/bin/i686-elf-objcopy
+
+LIBGCC = ./local/tooling/lib/gcc/i686-elf/7.1.0/libgcc.a
 
 override CC_FLAGS_COM += -Wall -Wextra -pedantic \
 	-ffreestanding -fno-pie -std=c99
@@ -17,7 +20,7 @@ override LD_FLAGS     += -m elf_i386 -nostdlib -N
 ### User Rules ###
 .PHONY: debug release clean run
 
-debug: CC_FLAGS = $(CC_FLAGS_COM) -O0
+debug: CC_FLAGS = $(CC_FLAGS_COM) -g -O0
 debug: $(VOLUME_IMAGE)
 
 release: CC_FLAGS = $(CC_FLAGS_COM) -Werror -O2
@@ -26,10 +29,10 @@ release: $(VOLUME_IMAGE)
 clean:
 	-rm -r $(BUILD_DIR)
 
-run: $(VOLUME_IMAGE)
+run:
 	GDK_SCALE=2 qemu-system-i386 -display gtk -boot order=a \
 		-M accel=kvm -m 16 -serial stdio \
-		-drive format=raw,if=floppy,index=0,file=$<
+		-drive format=raw,if=floppy,index=0,file=$(VOLUME_IMAGE)
 
 ### Whatever all this is ###
 $(VOLUME_IMAGE): $(BOOT_SECTOR) $(VOLUME_DIR)/loader.sys
@@ -46,7 +49,11 @@ GET_DEPS_ASM = $(shell find $(SOURCE_DIR)/$1 -type f -name "*.asm")
 GET_OBJS = $(patsubst $(SOURCE_DIR)%.c,$(BUILD_DIR)%.o,$(call GET_DEPS_C,$1)) \
 	$(patsubst $(SOURCE_DIR)%.asm,$(BUILD_DIR)%.o,$(call GET_DEPS_ASM,$1))
 
-$(VOLUME_DIR)/loader.sys: $(call GET_OBJS,loader)
+$(VOLUME_DIR)/loader.sys: $(BUILD_DIR)/loader.elf
+	@dirname $@ | xargs mkdir -p
+	$(OC) -O binary $< $@
+
+$(BUILD_DIR)/loader.elf: $(call GET_OBJS,loader) $(LIBGCC)
 	@dirname $@ | xargs mkdir -p
 	$(LD) -T $(SOURCE_DIR)/loader/linker.ld $(LD_FLAGS) -o $@ $^
 
