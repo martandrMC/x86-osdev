@@ -196,7 +196,7 @@ static bool finalize_specifier(
 	return true;
 }
 
-// Regex: %[ 0+-]*([1-9]\d*|\*)?(.(\d*|\*))?(ll?|hh?|[jtz])?[diuxXbBcsp%]
+// Regex: %[ #0+-]*([1-9]\d*|\*)?(.(\d*|\*))?(ll?|hh?|[jtz])?[diuxXbBcsp%]
 static bool vsnprintf_impl(state_t *state, const char *fmt, va_list *args) {
 	for(unsigned i = 0; ; ) {
 		specifier_t spec = {.prec = -1};

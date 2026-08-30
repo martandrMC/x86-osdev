@@ -1,7 +1,16 @@
 #include "defs.h"
 #include "ports.h"
+#include "idt.h"
 #include "library/printf.h"
 #include <stdint.h>
+
+/* TODO List:
+	Interrupts
+	Keyboard
+	Floppy Driver
+	Parse ELF
+	Load Kernel
+*/
 
 void disable_cursor(void) {
 	port_out8(0x3D4, 0x0A);
@@ -9,21 +18,9 @@ void disable_cursor(void) {
 	port_out8(0x3D5, curr | (1 << 5));
 }
 
-char *num_to_hex(uint8_t chars, uint32_t num) {
-	static char buf[9];
-	for(uint32_t i = 0; i < chars; i++) {
-		char c = '0' + (num & 0xF);
-		if(c >= ':') c += 7;
-		buf[chars - i - 1] = c;
-		num >>= 4;
-	}
-	buf[chars] = '\0';
-	return buf;
-}
-
 static uint16_t *vga = (uint16_t *) 0xB8000;
 void print_to_vga(const char *str) {
-	static uint8_t cur_x = 0, cur_y = 0;
+	static uint16_t cur_x = 0, cur_y = 0;
 	for(uint32_t i = 0; ; i++) {
 		char c = str[i];
 		switch(c) {
@@ -61,6 +58,15 @@ static const char *map_type_names[] = {
 	"ACPI Data", "ACPI NVS", "Bad Mem"
 };
 
+void keyboard_irq(irq_state_t *state) {
+	(void) state;
+	uint8_t code = port_in8(0x60);
+	char buf[4]; snprintf(buf, 4, "%02X ", code);
+	print_to_vga(buf);
+
+	port_out8(0x20, 0x20);
+}
+
 void loader_main(bios_data_t *collected_data) {
 	disable_cursor();
 	for(int i = 0; i < 80 * 25; i++) vga[i] = 0x1F00;
@@ -90,4 +96,11 @@ void loader_main(bios_data_t *collected_data) {
 		collected_data->bpb_data->sects_per_fat,
 		collected_data->bpb_data->entry_count);
 	print_to_vga(buffer);
+
+	port_out8(0x21, ~2);
+	port_out8(0xA1, ~0);
+
+	register_isr(keyboard_irq, 0x09, IDT_PRESENT | IDT_INTR_GATE);
+	__asm__ volatile("lidt %0" : : "m"(loader_idt));
+	__asm__ volatile("sti");
 }

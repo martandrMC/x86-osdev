@@ -60,9 +60,9 @@ jmp_buffer:
 	seg_%1 equ .%1 - ._bgn
 	dw %3 & 0xFFFF              ; limit[15:0]
 	dw %2 & 0xFFFF              ; base[15:0]
-	db %2   >> 16 & 0xFF        ; base[23:16]
-	db (%4) >>  4 & 0xFF        ; access[7:0]
-	%assign flag (%4) & 0xF     ; flag[3:0]
+	db %2 >> 16 & 0xFF          ; base[23:16]
+	db %4 >>  4 & 0xFF          ; access[7:0]
+	%assign flag %4 & 0xF       ; flag[3:0]
 	%assign ulim %3 >> 16 & 0xF ; limit[19:16]
 	db flag << 4 | ulim         ; {flag, ulim}
 	%undef flag
