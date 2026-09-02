@@ -1,5 +1,6 @@
 #include "defs.h"
 #include "ports.h"
+#include "pic.h"
 #include "idt.h"
 #include "library/printf.h"
 #include <stdint.h>
@@ -68,7 +69,7 @@ void keyboard_irq(irq_state_t *state) {
 	port_out8(0x20, 0x20);
 }
 
-void loader_main(bios_data_t *collected_data) {
+asm_iface void loader_main(bios_data_t *collected_data) {
 	disable_cursor();
 	for(int i = 0; i < 80 * 25; i++) vga[i] = 0x1F00;
 	char buffer[80];
@@ -107,10 +108,10 @@ void loader_main(bios_data_t *collected_data) {
 		collected_data->bpb_data->entry_count);
 	print_to_vga(buffer);
 
-	port_out8(0x21, ~2);
-	port_out8(0xA1, ~0);
+	pic_setup(0x20);
+	pic_enable_line(1);
 
-	register_isr(keyboard_irq, 0x09, IDT_PRESENT | IDT_INTR_GATE);
+	register_isr(keyboard_irq, 0x21, IDT_PRESENT | IDT_INTR_GATE);
 	__asm__ volatile("lidt %0" : : "m"(loader_idt));
 	__asm__ volatile("sti");
 }

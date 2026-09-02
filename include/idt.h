@@ -14,7 +14,7 @@ typedef struct irq_state {
 } irq_state_t;
 
 typedef void (*irq_handler_f)(irq_state_t *state);
-extern irq_handler_f register_isr(
+asm_iface irq_handler_f register_isr(
 	irq_handler_f new_isr, uint8_t vector, uint8_t attrib);
 
 extern char loader_idt[];

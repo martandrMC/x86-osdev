@@ -78,7 +78,7 @@ loader_idt:
 	._bgn_ptr: dd ._bgn
 ._bgn:
 	%rep VECTOR_COUNT
-	dw 0, 0x10, 0, 0
+	dw 0, 0x08, 0, 0
 	%endrep
 ._end:
 

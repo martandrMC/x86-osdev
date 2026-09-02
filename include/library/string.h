@@ -1,9 +1,10 @@
 #ifndef STRING_H
 #define STRING_H
 
+#include "defs.h"
 #include <stddef.h>
 
-void *memset(void *buf, int sample, size_t count);
-size_t strlen(const char *str);
+asm_iface void *memset(void *buf, int sample, size_t count);
+asm_iface size_t strlen(const char *str);
 
 #endif

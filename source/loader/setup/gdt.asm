@@ -13,12 +13,6 @@ setup_gdt:
 	lea eax, [_loader_base]
 	add [loader_gdt._bgn_ptr], eax
 
-	; Apply same offset to the xfer segment's base
-	mov [loader_gdt.xfer + 2], ax
-	shr eax, 16
-	mov [loader_gdt.xfer + 4], al
-	mov [loader_gdt.xfer + 7], ah
-
 	ret
 
 ; Jump address in EBX
@@ -32,27 +26,14 @@ goto_pm32:
 	or  eax, 1
 	mov cr0, eax
 
-	; Label is under .real.text and so assumes a base of 0x8000
-	; Need a transfer CS to get us to PM32 with the same base
-	jmp seg_xfer:.pm32
-	.pm32: bits 32
-
-	; Set up all the data segments to be flat and full size
 	mov ax, seg_data
 	mov ss, ax
 	mov ds, ax
 	mov es, ax
 
-	; Using DS, we can now access .bss section to populate
-	; our second far jump to the flat CS and enter C code
-	mov [jmp_buffer.off], ebx
-	mov word [jmp_buffer.seg], seg_code
-	jmp far [jmp_buffer]
-
-section .bss
-jmp_buffer:
-	.off: resd 1
-	.seg: resw 1
+	push dword seg_code
+	push ebx
+	o32 retf
 
 ; gdt_entry label, base, limit, access+flags
 %macro gdt_entry 4
@@ -77,7 +58,6 @@ loader_gdt:
 	._bgn_ptr: dd ._bgn ; + _loader_base
 ._bgn:
 	.null: dq 0
-	gdt_entry xfer, -1, 0x0FFFF, 0b1001_1010_0100
 	gdt_entry code,  0, 0xFFFFF, 0b1001_1010_1100
 	gdt_entry data,  0, 0xFFFFF, 0b1001_0010_1100
 ._end:
