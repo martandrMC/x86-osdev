@@ -14,8 +14,9 @@ arena_alloc:
 	not ax     ; Invert to mask out low bits
 	and bx, ax ; Correct the overshoot
 
-	xchg bx, [cs:arena_ptr] ; Bring old pointer to BX
-	add [cs:arena_ptr], bx  ; Add it back onto offset
+	; Add BX to arena_ptr whilst bringing
+	; old arena_ptr back into BX
+	xadd [cs:arena_ptr], bx
 
 	pop ax
 	ret

@@ -14,6 +14,12 @@ void pic_setup(uint8_t irq_base) {
 	port_out8(PIC1_DAT, ~0);       port_out8(PIC2_DAT, ~0);
 }
 
+void pic_send_eoi(uint8_t id) {
+	if(id > 15) return;
+	if(id > 7) port_out8(PIC2_CMD, 0x20);
+	port_out8(PIC1_CMD, 0x20);
+}
+
 void pic_enable_line(uint8_t id) {
 	if(id > 15) return;
 	uint16_t port = (id > 7 ? (id -= 8, PIC2_DAT) : PIC1_DAT);

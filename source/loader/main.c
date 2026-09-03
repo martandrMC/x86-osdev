@@ -1,12 +1,12 @@
 #include "defs.h"
 #include "ports.h"
 #include "pic.h"
+#include "pit.h"
 #include "idt.h"
 #include "library/printf.h"
 #include <stdint.h>
 
 /* TODO List:
-	Interrupts
 	Keyboard
 	Floppy Driver
 	Parse ELF
@@ -24,11 +24,17 @@ static uint16_t *vga = (uint16_t *) 0xB8000;
 void print_to_vga(const char *str) {
 	static uint16_t cur_x = 0, cur_y = 0;
 	for(uint32_t i = 0; ; i++) {
-		char c = str[i];
+		uint8_t c = (uint8_t) str[i];
 		switch(c) {
 			case '\0': return;
 			case '\t': cur_x += TAB_SIZE - cur_x % TAB_SIZE; continue;
 			case '\n': cur_x = 0, cur_y++; continue;
+			case '\b':
+				if(cur_x == 0) {
+					if(cur_y > 0) cur_y--;
+					cur_x = 79;
+				} else cur_x--;
+				continue;
 			default: break;
 		}
 		uint32_t offset = cur_y * 80 + cur_x;
@@ -65,8 +71,7 @@ void keyboard_irq(irq_state_t *state) {
 	uint8_t code = port_in8(0x60);
 	char buf[4]; snprintf(buf, 4, "%02X ", code);
 	print_to_vga(buf);
-
-	port_out8(0x20, 0x20);
+	pic_send_eoi(1);
 }
 
 asm_iface void loader_main(bios_data_t *collected_data) {
@@ -109,9 +114,18 @@ asm_iface void loader_main(bios_data_t *collected_data) {
 	print_to_vga(buffer);
 
 	pic_setup(0x20);
-	pic_enable_line(1);
+	pit_setup();
 
 	register_isr(keyboard_irq, 0x21, IDT_PRESENT | IDT_INTR_GATE);
-	__asm__ volatile("lidt %0" : : "m"(loader_idt));
-	__asm__ volatile("sti");
+	pic_enable_line(1);
+
+	load_idt(loader_idt);
+	interrupts_on();
+
+	for(;;) {
+		print_to_vga("|\b");  pit_delay(125);
+		print_to_vga("/\b");  pit_delay(125);
+		print_to_vga("-\b");  pit_delay(125);
+		print_to_vga("\\\b"); pit_delay(125);
+	}
 }
