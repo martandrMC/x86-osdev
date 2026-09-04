@@ -3,6 +3,7 @@ section .real.text
 
 struc bios_data
 	.bpb_addr resd 1
+	.fdc_dma  resd 1
 	.map_addr resd 1
 	.map_size resw 1
 endstruc
@@ -41,6 +42,9 @@ loader_entry:
 	call collect_bpb
 	mov [es:collected_data + bios_data.bpb_addr], bx
 
+	lea bx, [fdc_dma_buffer]
+	mov [es:collected_data + bios_data.fdc_dma],  bx
+
 	call collect_e820
 	mov [es:collected_data + bios_data.map_addr], bx
 	mov [es:collected_data + bios_data.map_size], ax
@@ -56,6 +60,7 @@ loader_entry:
 
 section .real.bss
 collected_data: resb bios_data_size
+fdc_dma_buffer: resb 512 ; One sector
 
 bits 32
 section .text

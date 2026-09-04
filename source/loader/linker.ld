@@ -25,11 +25,13 @@ SECTIONS {
 
 	. = _prot_base;
 	.prot : AT(_prot_base) {
+		_prot_start = .;
 		*(.text*)
 		. = ALIGN(4);
 		*(.rodata*)
 		. = ALIGN(4);
 		*(.data*)
+		_prot_end = .;
 	}
 
 	.prot.bss (NOLOAD) : ALIGN(16) {

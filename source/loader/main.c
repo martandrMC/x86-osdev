@@ -1,7 +1,8 @@
 #include "defs.h"
 #include "ports.h"
-#include "pic.h"
-#include "pit.h"
+#include "parts/pic.h"
+#include "parts/pit.h"
+#include "parts/fdc.h"
 #include "idt.h"
 #include "library/printf.h"
 #include <stdint.h>
@@ -57,6 +58,7 @@ typedef struct packed map_entry {
 
 typedef struct packed bios_data {
 	bpb_data_t *bpb_data;
+	uint8_t *fdc_dma_buf;
 	map_entry_t *map_entries;
 	uint16_t map_entry_count;
 } bios_data_t;
@@ -66,25 +68,17 @@ static const char *map_type_names[] = {
 	"ACPI Data", "ACPI NVS", "Bad Mem"
 };
 
-void keyboard_irq(irq_state_t *state) {
-	(void) state;
-	uint8_t code = port_in8(0x60);
-	char buf[4]; snprintf(buf, 4, "%02X ", code);
-	print_to_vga(buf);
-	pic_send_eoi(1);
-}
-
 asm_iface void loader_main(bios_data_t *collected_data) {
 	disable_cursor();
 	for(int i = 0; i < 80 * 25; i++) vga[i] = 0x1F00;
 	char buffer[80];
 
 	extern char _loader_base[], _real_end[];
-	extern char _prot_bss_end[], _prot_base[];
+	extern char _prot_end[], _prot_base[];
 	print_to_vga("Section Bounds:\n");
 	snprintf(buffer, 80, "\tReal: %p - %08tx (%p)\n\tProt: %p - %p (%08tx)\n\n",
 		_loader_base, _loader_base + (uintptr_t) _real_end, _real_end,
-		_prot_base, _prot_bss_end, (ptrdiff_t)(_prot_bss_end - _prot_base));
+		_prot_base, _prot_end, (ptrdiff_t)(_prot_end - _prot_base));
 	print_to_vga(buffer);
 
 	print_to_vga("BIOS E820 Table:\n");
@@ -114,18 +108,21 @@ asm_iface void loader_main(bios_data_t *collected_data) {
 	print_to_vga(buffer);
 
 	pic_setup(0x20);
-	pit_setup();
-
-	register_isr(keyboard_irq, 0x21, IDT_PRESENT | IDT_INTR_GATE);
-	pic_enable_line(1);
-
-	load_idt(loader_idt);
+	__asm__ volatile("lidt %0" : : "m"(loader_idt));
 	interrupts_on();
 
+	pit_setup();
+	fdc_init(collected_data->fdc_dma_buf);
+
+	snprintf(buffer, 80, "%02X%02X\n",
+		collected_data->fdc_dma_buf[510],
+		collected_data->fdc_dma_buf[511]);
+	print_to_vga(buffer);
+
 	for(;;) {
-		print_to_vga("|\b");  pit_delay(125);
-		print_to_vga("/\b");  pit_delay(125);
-		print_to_vga("-\b");  pit_delay(125);
-		print_to_vga("\\\b"); pit_delay(125);
+		print_to_vga("|\b");  pit_delay(125*MSEC);
+		print_to_vga("/\b");  pit_delay(125*MSEC);
+		print_to_vga("-\b");  pit_delay(125*MSEC);
+		print_to_vga("\\\b"); pit_delay(125*MSEC);
 	}
 }

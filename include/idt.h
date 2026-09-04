@@ -23,6 +23,5 @@ extern char loader_idt[];
 #define interrupt_wait() __asm__ volatile("hlt")
 #define interrupts_off() __asm__ volatile("cli")
 #define interrupts_on() __asm__ volatile("sti")
-#define load_idt(ptr) __asm__ volatile("lidt %0" : : "m"(ptr));
 
 #endif

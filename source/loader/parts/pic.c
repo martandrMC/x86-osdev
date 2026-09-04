@@ -1,4 +1,4 @@
-#include "pic.h"
+#include "parts/pic.h"
 #include "ports.h"
 
 #define PIC1_CMD 0x20
