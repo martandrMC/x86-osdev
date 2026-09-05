@@ -1,5 +1,5 @@
-#ifndef PIT_H
-#define PIT_H
+#ifndef PARTS_PIT_H
+#define PARTS_PIT_H
 
 #define USEC 1
 #define MSEC 1000

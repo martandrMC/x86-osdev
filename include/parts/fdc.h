@@ -1,5 +1,5 @@
-#ifndef FDC_H
-#define FDC_H
+#ifndef PARTS_FDC_H
+#define PARTS_FDC_H
 
 #include <stdbool.h>
 #include <stdint.h>

@@ -1,9 +1,8 @@
 #include "parts/fdc.h"
 #include "parts/pit.h"
+#include "parts/pic.h"
 #include "ports.h"
 #include "idt.h"
-#include "parts/pic.h"
-#include "library/printf.h"
 
 #define RQM_POLL_RETRIES 20
 
@@ -98,7 +97,7 @@ static bool head_recalibrate(void) {
 	return (st0 == 0x20 && track == 0);
 }
 
-extern void print_to_vga(const char *str);
+extern void vga_print(const char *str);
 bool fdc_init(uint8_t *dma_buffer) {
 	register_isr(irq_handler, 0x26, IDT_PRESENT | IDT_INTR_GATE);
 	pic_enable_line(6);
