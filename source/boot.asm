@@ -1,7 +1,7 @@
 bits 16
 
 BPB_TOTAL_SECTS    equ 0x13
-BPB_SECTS_PER_CYL  equ 0x18
+BPB_SECTS_PER_TRK  equ 0x18
 BPB_HEAD_COUNT     equ 0x1A
 BPB_DRIVE_NUMBER   equ 0x24
 
@@ -211,7 +211,7 @@ lba_read:
 		push cx    ; Save LBA offset
 		mov ax, cx ; Put LBA in AX and do a read
 		
-		mov si, [cs:BPB_SECTS_PER_CYL]
+		mov si, [cs:BPB_SECTS_PER_TRK]
 		xor dx, dx ; Zero the upper half of the dividend
 		div si     ; AX div SI -> Q = AX, R = DX
 		mov cx, dx ; Remainder was our sector

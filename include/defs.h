@@ -5,4 +5,7 @@
 #define force_inline __attribute__((always_inline)) static
 #define asm_iface
 
+#define min(x,y) ((x) < (y) ? (x) : (y))
+#define max(x,y) ((x) > (y) ? (x) : (y))
+
 #endif

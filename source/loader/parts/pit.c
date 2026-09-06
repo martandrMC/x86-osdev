@@ -13,7 +13,7 @@ typedef struct timeout {
 static struct {
 	unsigned delay_ticks;
 	timeout_t timeouts[MAX_TIMEOUTS];
-} state = {0};
+} state;
 
 static void irq_handler(irq_state_t *dummy) {
 	(void) dummy;

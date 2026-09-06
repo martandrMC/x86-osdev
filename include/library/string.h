@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 asm_iface void *memset(void *buf, int sample, size_t count);
+asm_iface void *memcpy(void *dst, const void *src, size_t count);
 asm_iface size_t strlen(const char *str);
 
 #endif

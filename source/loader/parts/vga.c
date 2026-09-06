@@ -31,7 +31,6 @@ static void clear_line(uint8_t y) {
 
 void vga_init(uint8_t tab_size) {
 	state.vram = (uint16_t *) 0xB8000;
-	state.curr_x = state.curr_y = 0;
 	state.tab_size = tab_size;
 
 	disable_cursor();

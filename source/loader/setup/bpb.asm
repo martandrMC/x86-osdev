@@ -2,7 +2,7 @@ bits 16
 section .real.text
 
 BPB_TOTAL_SECTS    equ 0x13
-BPB_SECTS_PER_CYL  equ 0x18
+BPB_SECTS_PER_TRK  equ 0x18
 BPB_HEAD_COUNT     equ 0x1A
 BPB_DRIVE_NUMBER   equ 0x24
 
@@ -14,7 +14,7 @@ BPB_ENTRY_COUNT    equ 0x11
 
 struc bpb_data
 	.total_sects:    resw 1
-	.sects_per_cyl:  resw 1
+	.sects_per_trk:  resw 1
 	.head_count:     resb 1
 	.boot_drive_id:  resb 1
 
@@ -44,8 +44,8 @@ collect_bpb:
 
 	mov dx, [BPB_TOTAL_SECTS]
 	mov [es:bx + bpb_data.total_sects], dx
-	mov dx, [BPB_SECTS_PER_CYL]
-	mov [es:bx + bpb_data.sects_per_cyl], dx
+	mov dx, [BPB_SECTS_PER_TRK]
+	mov [es:bx + bpb_data.sects_per_trk], dx
 	mov dl, [BPB_HEAD_COUNT]
 	mov[es:bx + bpb_data.head_count], dl
 	mov dl, [BPB_DRIVE_NUMBER]

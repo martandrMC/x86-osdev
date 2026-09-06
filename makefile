@@ -42,6 +42,7 @@ $(VOLUME_IMAGE): $(BOOT_SECTOR) $(VOLUME_DIR)/loader.sys
 	nasm -fbin $(BOOT_SECTOR) -o /dev/stdout | \
 		dd bs=1 seek=62 conv=notrunc of=$(VOLUME_IMAGE)
 	mcopy -i $(VOLUME_IMAGE) $(VOLUME_DIR)/loader.sys ::/
+#	mcopy -i $(VOLUME_IMAGE) local/lorem.txt ::/
 	mattrib -i $(VOLUME_IMAGE) +r +s -a ::/loader.sys
 
 GET_DEPS_C   = $(shell find $(SOURCE_DIR)/$1 -type f -name "*.c")
