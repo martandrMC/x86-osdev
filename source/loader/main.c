@@ -9,7 +9,6 @@
 #include <stdint.h>
 
 /* TODO List:
-	Floppy Driver
 	Split Makefiles
 	Keyboard
 	Parse ELF
@@ -63,6 +62,11 @@ static void dump_memory(uint8_t *addr, unsigned count) {
 }
 
 asm_iface void loader_main(bios_data_t *collected_data) {
+	pic_setup(0x20); pit_setup();
+	__asm__ volatile("lidt %0" : : "m"(loader_idt));
+	interrupts_on();
+	// Breakpoints Past Here //
+
 	vga_init(4);
 	char buffer[80];
 
@@ -100,11 +104,6 @@ asm_iface void loader_main(bios_data_t *collected_data) {
 		collected_data->bpb_data->fsys_info.entry_count);
 	vga_puts(buffer);
 
-	pic_setup(0x20);
-	__asm__ volatile("lidt %0" : : "m"(loader_idt));
-	interrupts_on();
-
-	pit_setup();
 	fdc_init(&collected_data->bpb_data->media_info,
 		collected_data->dma_buffer, collected_data->dma_size);
 

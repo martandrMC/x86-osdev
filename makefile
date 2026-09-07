@@ -14,25 +14,31 @@ OC = ./local/tooling/bin/i686-elf-objcopy
 LIBGCC = ./local/tooling/lib/gcc/i686-elf/7.1.0/libgcc.a
 
 override CC_FLAGS_COM += -Wall -Wextra -pedantic \
-	-ffreestanding -fno-pie -std=c99
+	-ffreestanding -fno-pie -fno-strict-aliasing -std=c99
 override LD_FLAGS     += -m elf_i386 -nostdlib -N
 
 ### User Rules ###
-.PHONY: debug release clean run
-
-debug: CC_FLAGS = $(CC_FLAGS_COM) -g -O0
-debug: $(VOLUME_IMAGE)
-
-release: CC_FLAGS = $(CC_FLAGS_COM) -Werror -O2
-release: $(VOLUME_IMAGE)
+.PHONY: clean release run debug extras
 
 clean:
 	-rm -r $(BUILD_DIR)
 
+release: CC_FLAGS = $(CC_FLAGS_COM) -Werror -O2 -Os
+release: $(VOLUME_IMAGE)
 run:
 	GDK_SCALE=2 qemu-system-i386 -display gtk -boot order=a \
 		-M accel=kvm -m 16 -serial stdio \
 		-drive format=raw,if=floppy,index=0,file=$(VOLUME_IMAGE)
+
+debug: CC_FLAGS = $(CC_FLAGS_COM) -g -O0
+debug: $(VOLUME_IMAGE)
+	@echo "QEMU_READY"
+	GDK_SCALE=2 qemu-system-i386 -display gtk -boot order=a \
+		-M accel=tcg -m 16 -serial stdio -S -s \
+		-drive format=raw,if=floppy,index=0,file=$(VOLUME_IMAGE)
+
+extras:
+	mcopy -i $(VOLUME_IMAGE) local/lorem.txt ::/
 
 ### Whatever all this is ###
 $(VOLUME_IMAGE): $(BOOT_SECTOR) $(VOLUME_DIR)/loader.sys
@@ -42,7 +48,6 @@ $(VOLUME_IMAGE): $(BOOT_SECTOR) $(VOLUME_DIR)/loader.sys
 	nasm -fbin $(BOOT_SECTOR) -o /dev/stdout | \
 		dd bs=1 seek=62 conv=notrunc of=$(VOLUME_IMAGE)
 	mcopy -i $(VOLUME_IMAGE) $(VOLUME_DIR)/loader.sys ::/
-#	mcopy -i $(VOLUME_IMAGE) local/lorem.txt ::/
 	mattrib -i $(VOLUME_IMAGE) +r +s -a ::/loader.sys
 
 GET_DEPS_C   = $(shell find $(SOURCE_DIR)/$1 -type f -name "*.c")

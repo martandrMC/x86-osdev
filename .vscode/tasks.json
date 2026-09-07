@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Launch QEMU",
+			"type": "shell",
+			"command": "make",
+			"args": [ "clean", "debug" ],
+			"isBackground": true,
+			"presentation": { "reveal": "never" },
+			"problemMatcher": {
+				"pattern": { "regexp": "^(never)matches$" },
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^(never)matches$",
+					"endsPattern": "QEMU_READY"
+				}
+			}
+		}
+	]
+}

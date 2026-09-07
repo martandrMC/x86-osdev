@@ -1,0 +1,16 @@
+{
+	"configurations": [
+		{
+			"name": "Debug Loader",
+			"type": "cppdbg",
+			"request": "launch",
+			"preLaunchTask": "Launch QEMU",
+			"miDebuggerServerAddress": "localhost:1234",
+			"program": "${workspaceFolder}/build/loader.elf",
+			"miDebuggerPath": "gdb-multiarch",
+			"MIMode": "gdb",
+			"cwd": "${workspaceFolder}",
+			"stopAtEntry": false
+		}
+	]
+}
