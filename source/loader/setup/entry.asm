@@ -4,7 +4,7 @@ section .real.text
 DMA_SIZE equ 512 * 8
 
 struc bios_data
-	.bpb_addr resd 1
+	.med_addr resd 1
 	.dma_addr resd 1
 	.dma_size resw 1
 	.map_addr resd 1
@@ -43,7 +43,7 @@ loader_entry:
 	; DX has been left untouched and should still
 	; contain 0x07C0 from when stage 1 set it
 	call collect_bpb
-	mov [es:collected_data + bios_data.bpb_addr], bx
+	mov [es:collected_data + bios_data.med_addr], bx
 
 	lea bx, [dma_buffer]
 	mov [es:collected_data + bios_data.dma_addr], bx

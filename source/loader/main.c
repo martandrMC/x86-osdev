@@ -9,29 +9,19 @@
 #include <stdint.h>
 
 /* TODO List:
+	FAT12 Reading
 	Split Makefiles
 	Keyboard
 	Parse ELF
 	Load Kernel
 */
 
-typedef struct packed fsys_info {
-	uint16_t reserved_count;
-	uint8_t fat_count, sects_per_clus;
-	uint16_t sects_per_fat, entry_count;
-} fsys_info_t;
-
-typedef struct packed bpb_data {
-	media_info_t media_info;
-	fsys_info_t fsys_info;
-} bpb_data_t;
-
 typedef struct packed map_entry {
 	uint32_t base, size, type;
 } map_entry_t;
 
 typedef struct packed bios_data {
-	bpb_data_t *bpb_data;
+	media_info_t *media_info;
 	uint8_t *dma_buffer;
 	uint16_t dma_size;
 	map_entry_t *map_entries;
@@ -92,26 +82,18 @@ asm_iface void loader_main(bios_data_t *collected_data) {
 	vga_puts("\n");
 
 	snprintf(buffer, 80,
-		"BPB: %04X %04X %02X %02X %04X %02X %02X %04X %04X\n\n",
-		collected_data->bpb_data->media_info.total_sects,
-		collected_data->bpb_data->media_info.sects_per_trk,
-		collected_data->bpb_data->media_info.head_count,
-		collected_data->bpb_data->media_info.boot_drive_id,
-		collected_data->bpb_data->fsys_info.reserved_count,
-		collected_data->bpb_data->fsys_info.fat_count,
-		collected_data->bpb_data->fsys_info.sects_per_clus,
-		collected_data->bpb_data->fsys_info.sects_per_fat,
-		collected_data->bpb_data->fsys_info.entry_count);
+		"BPB: %04X %04X %02X %02X\n\n",
+		collected_data->media_info->total_sects,
+		collected_data->media_info->sects_per_trk,
+		collected_data->media_info->head_count,
+		collected_data->media_info->boot_drive_id);
 	vga_puts(buffer);
 
-	fdc_init(&collected_data->bpb_data->media_info,
+	fdc_init(collected_data->media_info,
 		collected_data->dma_buffer, collected_data->dma_size);
 
 	static uint8_t sector[512];
-	
-	fsys_info_t *fsys = &collected_data->bpb_data->fsys_info;
-	uint16_t lba = fsys->reserved_count + fsys->fat_count * fsys->sects_per_fat;
-	fdc_read(sector, lba, 1);
+	fdc_read(sector, 0, 1);
 	dump_memory(sector, 128);
 
 	for(;;) {

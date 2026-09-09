@@ -5,7 +5,8 @@
 #include "ports.h"
 #include "idt.h"
 
-#define RQM_POLL_RETRIES 20
+#define RQM_RETRIES   20
+#define RESET_RETRIES 3
 
 #define GP_OUTPUT 0x3F2 // write-only
 #define MAIN_STAT 0x3F4 // read-only
@@ -45,7 +46,7 @@ static bool wait_timeout(unsigned usec) {
 }
 
 static bool fifo_send(uint8_t byte) {
-	for (int i = 0; i < RQM_POLL_RETRIES; i++) {
+	for (int i = 0; i < RQM_RETRIES; i++) {
 		uint8_t stat = port_in8(MAIN_STAT);
 		if(!(stat & MAIN_STAT_RQM)) continue;
 		if(stat & MAIN_STAT_DIO) return false;
@@ -56,7 +57,7 @@ static bool fifo_send(uint8_t byte) {
 }
 
 static bool fifo_recv(uint8_t *byte) {
-	for (int i = 0; i < RQM_POLL_RETRIES; i++) {
+	for (int i = 0; i < RQM_RETRIES; i++) {
 		uint8_t stat = port_in8(MAIN_STAT);
 		if (!(stat & MAIN_STAT_RQM)) continue;
 		if (!(stat & MAIN_STAT_DIO)) return false;
@@ -91,13 +92,18 @@ static void dma_set_size(uint16_t bytes) {
 }
 
 static bool controller_reset(void) {
-	port_out8(GP_OUTPUT, 0);
-	pit_delay(10*USEC);
-	wait_prepare();
-	port_out8(GP_OUTPUT, 0x0C);
-	return wait_timeout(100*MSEC);
+	for(int i = 0; i < RESET_RETRIES; i++) {
+		port_out8(GP_OUTPUT, 0);
+		pit_delay(10*USEC);
+		wait_prepare();
+		port_out8(GP_OUTPUT, 0x0C);
+		if(wait_timeout(100*MSEC))
+			return true;
+	}
+	return false;
 }
 
+// TODO: Error handling
 static bool controller_recalibrate(void) {
 	wait_prepare();
 	if(!fifo_send(CMD_RECALIB)) return false;
@@ -112,7 +118,7 @@ static bool controller_recalibrate(void) {
 	return (st0 == 0x20 && track == 0);
 }
 
-// TODO: Error checking
+// TODO: Error handling
 bool fdc_init(media_info_t *info, uint8_t *dma_buffer, uint16_t dma_size) {
 	if(info->boot_drive_id != 0) return false;
 
@@ -144,15 +150,19 @@ bool fdc_init(media_info_t *info, uint8_t *dma_buffer, uint16_t dma_size) {
 	return true;
 }
 
-// TODO: Error checking
+// TODO: Error handling
 bool controller_read(uint8_t cyl, uint8_t head, uint8_t sect) {
 	uint8_t dummy;
 
 	wait_prepare();
 	fifo_send(CMD_SEEKTRK);
-	fifo_send(head << head);
+	fifo_send(head << 2);
 	fifo_send(cyl);
 	wait_timeout(3*SEC);
+
+	fifo_send(CMD_SENSINT);
+	fifo_recv(&dummy);
+	fifo_recv(&dummy);
 
 	wait_prepare();
 	fifo_send(CMD_READMFM);
@@ -175,7 +185,7 @@ bool controller_read(uint8_t cyl, uint8_t head, uint8_t sect) {
 	return true;
 }
 
-// TODO: Error checking
+// TODO: Error handling
 bool fdc_read(uint8_t *data_out, uint16_t lba, uint8_t sects) {
 	if(data_out == NULL) return false;
 	if(lba + sects > state.info->total_sects) return false;
